@@ -88,6 +88,99 @@ class exports.SVGLayer extends Layer
 				y: @y + start.y
 			return point
 
+	@define "anchorpoints",
+
+		get: ->
+
+			# wonky / semi-broken:
+			start = @html.indexOf(' d="')
+			end = @html.indexOf('" fill')
+			if end is -1 then end = @html.indexOf('"></path>')
+			path = @html.substring(start + 4, end)
+			array = path.split(" ")
+			anchorpoints = []
+
+			i = 0
+
+			# Lazy / limited to low-complex SVGs due to "while" limitation. Rewrite as recursive function?
+			while i < array.length
+
+				unless Number(array[i])
+					anchorpoint = {}
+					anchorpoint.type = array[i]
+
+					switch array[i]
+
+						# Anchorpoints include their respective controlpoints
+
+						when "M"
+							# Controlpoints are included for "M" and "L" to allow hotswapping of anchorpoint type
+							anchorpoint.x1 = {}
+							anchorpoint.x2 = {}
+							anchorpoint.x1.x = Number(array[i + 1])
+							anchorpoint.x1.y = Number(array[i + 2])
+							anchorpoint.x2.x = Number(array[i + 1])
+							anchorpoint.x2.y = Number(array[i + 2])
+							anchorpoint.x = Number(array[i + 1])
+							anchorpoint.y = Number(array[i + 2])
+							i += 2
+
+						when "L"
+							anchorpoint.x1 = {}
+							anchorpoint.x2 = {}
+							anchorpoint.x1.x = Number(array[i + 1])
+							anchorpoint.x1.y = Number(array[i + 2])
+							anchorpoint.x2.x = Number(array[i + 1])
+							anchorpoint.x2.y = Number(array[i + 2])
+							anchorpoint.x = Number(array[i + 1])
+							anchorpoint.y = Number(array[i + 2])
+							i += 2
+
+						when "C"
+							anchorpoint.x1 = {}
+							anchorpoint.x2 = {}
+							anchorpoint.x1.x = Number(array[i + 1])
+							anchorpoint.x1.y = Number(array[i + 2])
+							anchorpoint.x2.x = Number(array[i + 3])
+							anchorpoint.x2.y = Number(array[i + 4])
+							anchorpoint.x = Number(array[i + 5])
+							anchorpoint.y = Number(array[i + 6])
+							i += 6
+						else i++
+
+					anchorpoints.push(anchorpoint) 
+				i++
+			return anchorpoints
+
+		set: (anchorpoints) ->
+
+			# wonky / semi-broken:
+			firstPartEnd = @html.indexOf(' d="')
+			firstPart = @html.substring(0, firstPartEnd + 4)
+			thirdPartStart =  @html.indexOf(' fill')
+			if thirdPartStart is -1 then thirdPartStart = @html.indexOf('Z')
+			thirdPart = @html.substring(thirdPartStart + 1, @html.length)
+
+			path = ""
+
+			for anchorpoint in anchorpoints
+				switch anchorpoint.type
+					when "M" then path += "#{anchorpoint.type} #{anchorpoint.x} #{anchorpoint.y} "
+					when "L" then path += "#{anchorpoint.type} #{anchorpoint.x} #{anchorpoint.y} "
+
+					when "C"
+						anchorpoint.x1 ?= {}
+						anchorpoint.x2 ?= {}
+						anchorpoint.x1.x ?= anchorpoint.x
+						anchorpoint.x1.y ?= anchorpoint.y
+						anchorpoint.x2.x ?= anchorpoint.x
+						anchorpoint.x2.y ?= anchorpoint.y
+						path += "#{anchorpoint.type} #{anchorpoint.x1.x} #{anchorpoint.x1.y} #{anchorpoint.x2.x} #{anchorpoint.x2.y} #{anchorpoint.x} #{anchorpoint.y} "
+
+					else path += "#{anchorpoint.type} "
+
+			@html = "#{firstPart}#{path}#{thirdPart}"
+
 	updateGradientSVG: ->
 		return if @__constructor
 		if not Gradient.isGradient(@gradient)
