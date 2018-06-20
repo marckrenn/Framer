@@ -355,6 +355,8 @@ class exports.Layer extends BaseClass
 	@define "backgroundGrayscale", layerProperty(@, "backgroundGrayscale", "webkitBackdropFilter", 0, _.isNumber)
 	@define "backgroundSepia", layerProperty(@, "backgroundSepia", "webkitBackdropFilter", 0, _.isNumber)
 
+	@define "backgroundSize", layerProperty(@, "backgroundSize", "backgroundSize", "fill", _.isString)
+
 	for i in [0..8]
 		do (i) =>
 			@define "shadow#{i+1}",
@@ -445,7 +447,7 @@ class exports.Layer extends BaseClass
 		get: ->
 			if @force2d
 				return @_matrix2d
-			return new Matrix()
+			return Matrix.identity3d()
 				.translate(@x, @y, @z)
 				.scale(@scale)
 				.scale(@scaleX, @scaleY, @scaleZ)
@@ -461,7 +463,7 @@ class exports.Layer extends BaseClass
 	# matrix of layer transforms when 2d is forced
 	@define "_matrix2d",
 		get: ->
-			return new Matrix()
+			return Matrix.identity3d()
 				.translate(@x, @y)
 				.scale(@scale)
 				.scale(@scaleX, @scaleY)
@@ -472,7 +474,7 @@ class exports.Layer extends BaseClass
 	# matrix of layer transforms with transform origin applied
 	@define "transformMatrix",
 		get: ->
-			return new Matrix()
+			return Matrix.identity3d()
 				.translate(@originX * @width, @originY * @height)
 				.multiply(@matrix)
 				.translate(-@originX * @width, -@originY * @height)
@@ -482,7 +484,7 @@ class exports.Layer extends BaseClass
 		get: ->
 			parent = @parent or @context
 			ppm = Utils.perspectiveMatrix(parent)
-			return new Matrix()
+			return Matrix.identity3d()
 				.multiply(ppm)
 				.multiply(@transformMatrix)
 
@@ -684,8 +686,8 @@ class exports.Layer extends BaseClass
 	convertPointToCanvas: (point) =>
 		return Utils.convertPointToContext(point, @, true)
 
-	convertPointToLayer: (point, layer) =>
-		return Utils.convertPoint(point, @, layer, true)
+	convertPointToLayer: (point, layer, rootContext=true) =>
+		return Utils.convertPoint(point, @, layer, rootContext)
 
 	@define "canvasFrame",
 		importable: true
@@ -704,8 +706,8 @@ class exports.Layer extends BaseClass
 			@frame = Utils.convertFrameFromContext(frame, @, false, false)
 
 	contentFrame: ->
-		return {x: 0, y: 0, width: 0, height: 0} unless @children.length
-		return Utils.frameMerge(_.map(@children, "frame"))
+		return {x: 0, y: 0, width: 0, height: 0} unless @_children.length
+		return Utils.frameMerge(_.map(@_children, "frame"))
 
 	totalFrame: ->
 		return Utils.frameMerge(@frame, @contentFrame())
@@ -994,7 +996,7 @@ class exports.Layer extends BaseClass
 
 		layer = @copySingle()
 
-		for child in @children
+		for child in @_children
 			copiedChild = child.copy()
 			copiedChild.parent = layer if copiedChild isnt null
 
@@ -1152,7 +1154,11 @@ class exports.Layer extends BaseClass
 		enumerable: false
 		exportable: false
 		importable: false
-		get: -> _.clone @_children
+		get: -> @_children.map (c) ->
+			if c instanceof SVGLayer and c.children.length is 1 and _.startsWith(c.name, '.')
+				return c.children[0]
+			else
+				return c
 
 	@define "siblings",
 		enumerable: false
@@ -1187,7 +1193,7 @@ class exports.Layer extends BaseClass
 
 	removeChild: (layer) ->
 
-		if layer not in @children
+		if layer not in @_children
 			return
 
 		layer.parent = null
@@ -1347,7 +1353,7 @@ class exports.Layer extends BaseClass
 
 	bringToFront: ->
 		maxIndex = null
-		siblings = @parent?.children ? @context._layers
+		siblings = @parent?._children ? @context._layers
 		return if siblings.count <= 1
 		for layer in siblings
 			continue if layer is @
@@ -1359,7 +1365,7 @@ class exports.Layer extends BaseClass
 
 	sendToBack: ->
 		minIndex = null
-		siblings = @parent?.children ? @context._layers
+		siblings = @parent?._children ? @context._layers
 		return if siblings.count <= 1
 		for layer in siblings
 			continue if layer is @

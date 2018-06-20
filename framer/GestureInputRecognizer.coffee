@@ -54,6 +54,7 @@ class exports.GestureInputRecognizer
 			started: {}
 			events: []
 			eventCount: 0
+			cancelTap: false
 
 		event = @_getGestureEvent(event)
 
@@ -71,7 +72,6 @@ class exports.GestureInputRecognizer
 		@_process(@_getGestureEvent(event))
 
 	touchend: (event) =>
-
 		# Only fire if there are no fingers left on the screen
 
 		if event.touches?
@@ -89,14 +89,10 @@ class exports.GestureInputRecognizer
 		event = @_getGestureEvent(event)
 
 		for eventName, value of @session.started
-			@["#{eventName}end"](event) if value
+			if value
+				@["#{eventName}end"](event)
 
-		# We only want to fire a tap event if the original target is the same
-		# as the release target, so buttons work the way you expect if you
-		# release the mouse outside.
-		if not @session?.startEvent
-			@tap(event)
-		else if @session.startEvent.target is event.target
+		if @shouldFireTapEvent(event)
 			@tap(event)
 
 		@tapend(event)
@@ -107,6 +103,19 @@ class exports.GestureInputRecognizer
 		@touchend(@session.lastEvent)
 
 	# Tap
+
+	shouldFireTapEvent: (event) ->
+		startEvent = @session?.startEvent
+		if startEvent?
+			# We only want to fire a tap event if the original target is the same
+			# as the release target, so buttons work the way you expect if you
+			# release the mouse outside.
+			isSameTarget = startEvent.target is event.target
+			isShortSession = event.time - @session.startTime  < 750
+			isShortDistance = Utils.pointDistance(startEvent.touchCenter, event.touchCenter) < 45
+			return isSameTarget and isShortSession and isShortDistance and not @session.cancelTap
+		else
+			return true
 
 	tap: (event) => @_dispatchEvent("tap", event)
 	tapstart: (event) => @_dispatchEvent("tapstart", event)

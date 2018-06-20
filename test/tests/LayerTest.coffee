@@ -378,6 +378,37 @@ describe "Layer", ->
 			layer.image = imagePath
 			layer.backgroundColor.should.equalColor "red"
 
+		describe "should set the background size", ->
+			it "cover", ->
+				layer = new Layer backgroundSize: "cover"
+				layer.style["background-size"].should.equal "cover"
+
+			it "contain", ->
+				layer = new Layer backgroundSize: "contain"
+				layer.style["background-size"].should.equal "contain"
+
+			it "percentage", ->
+				layer = new Layer backgroundSize: "100%"
+				layer.style["background-size"].should.equal "100%"
+
+			it "other", ->
+				layer = new Layer backgroundSize: "300px, 5em 10%"
+				layer.style["background-size"].should.equal "300px, 5em 10%"
+
+			it "fill", ->
+				layer = new Layer backgroundSize: "fill"
+				layer.style["background-size"].should.equal "cover"
+
+			it "fit", ->
+				layer = new Layer backgroundSize: "fit"
+				layer.style["background-size"].should.equal "contain"
+
+			it "stretch", ->
+				layer = new Layer backgroundSize: "stretch"
+				# This should be "100% 100%", but phantomjs doest return that when you set it
+				layer.style["background-size"].should.equal "100%"
+
+
 		it "should set visible", ->
 
 			layer = new Layer
@@ -1119,6 +1150,21 @@ describe "Layer", ->
 
 			layerC.superLayer = null
 			assert.deepEqual layerA.children, []
+
+		it "should ignore a hidden SVGLayer", ->
+			layerA = new Layer
+			layerB = new Layer
+				parent: layerA
+			svgLayer = new SVGLayer
+				parent: layerA
+				name: ".SVGLayer"
+				svg: '<svg xmlns="http://www.w3.org/2000/svg" width="62" height="62"><path d="M 31 0 C 48.121 0 62 13.879 62 31 C 62 48.121 48.121 62 31 62 C 13.879 62 0 48.121 0 31 C 0 13.879 13.879 0 31 0 Z" name="Oval"></path></svg>'
+			svgLayer2 = new SVGLayer
+				parent: layerA
+				name: ".SVGLayer",
+				svg: '<svg xmlns="http://www.w3.org/2000/svg" width="62" height="62"><path d="M 31 0 L 40.111 18.46 L 60.483 21.42 L 45.741 35.79 L 49.221 56.08 L 31 46.5 L 12.779 56.08 L 16.259 35.79 L 1.517 21.42 L 21.889 18.46 Z" name="Star"></path></svg>'
+			layerA.children.length.should.equal 3
+			layerA.children.should.eql [layerB, svgLayer.children[0], svgLayer2.children[0]]
 
 		it "should list sibling root layers", ->
 
